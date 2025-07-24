@@ -1,0 +1,59 @@
+Inspecting Page
+Incorrect subdomains redirects to /login
+Except robots.txt
+Or any domain that ends with an extension
+/<anytext>.txt will result in a 404 not found error
+Barely visible
+Can see easier through inspect
+Use this link to lookup common 404 not found error pages to identify a framework
+We see that Laravel matches our page
+Laravel is a php framework that is used for both backend (primarily) and frontend
+Registered a user
+New dashboard
+Found area to submit data to system
+Burpsuite
+Started burpsuite to view background details
+After removing cookie token and bearer token in different variations we can verify there is no IDOR vulnerability
+Copy and paste cookie token into https://www.jwt.io/ to see properties of token
+We can see registered user has role of “user”
+Check uuid version, however we see its version 4 (randomly generated) and cannot be exploited
+We use intercept when logging in
+We notice that upon sending request there is no session cookie
+And upon successful response there still is no session cookie
+This can be an indicator the client-side generates its own session cookie
+We go to inspect the page and click on Sources/Debugger tab
+In the directories we see _N_E as well as our target ip
+_N_E is a indicator of Next.js a react framework
+We see in the imports import { generateToken } from '@/lib/jwt'; 
+Then we navigate to down to where its called and we can verify a token is indeed being generated on the client-side
+// Generate JWT token client-side
+      const token = await generateToken({
+        userId: userData.id,
+        username: userData.username,
+        role: userData.role,
+      });
+
+From there we navigate to /_N_E/lib/jwt.ts to inspect how generateToken works which we can see below
+const JWT_SECRET = 'SecretKey-CriticalOps-2025';
+const secret = new TextEncoder().encode(JWT_SECRET);
+
+export type JWTPayload = {
+  userId: string;
+  username: string;
+  role: string;
+};
+
+export async function generateToken(payload: JWTPayload): Promise<string> {
+  const jwt = await new SignJWT(payload)
+    .setProtectedHeader({ alg: 'HS256' })
+    .setIssuedAt()
+    .setExpirationTime('8h')
+    .sign(secret);
+    
+  return jwt;
+}
+
+This information gives us the key needed to manipulate a token
+In burpsuite we go back to the /api/tickets and we use jwt editor to edit the jwt webtoken by changing the role from user to admin 
+Then to sign we use SecretKey-CriticalOps-2025 from the JWT_SECRET variable
+We press send on the repeater and we can now see in our response
